@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Far Cry 3 - Hoyt's Bar</title>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #050505; font-family: 'Courier New', Courier, monospace; user-select: none; color: #fff; touch-action: none; }
+        canvas { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; display: block; z-index: 1; }
+        #ui-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; z-index: 10; }
+        
+        #poker-ui { position: relative; display: flex; flex-direction: column; justify-content: space-between; width: 100%; height: 100%; min-height: 0; }
+        .top-bar { display: flex; justify-content: space-between; font-size: 13px; text-shadow: 2px 2px 2px #000; font-weight: bold; flex-shrink: 0; flex-wrap: wrap; gap: 4px; }
+        .top-bar span { color: #4cd137; }
+        .top-bar .pot-label { color: #f1c40f; }
+
+        /* Hoyt Dialogue Box */
+        #hoyt-dialogue { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #e74c3c; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 20; box-shadow: 0 4px 10px rgba(0,0,0,0.5); white-space: nowrap; }
+        #hoyt-dialogue::after { content: ''; position: absolute; bottom: -8px; left: 50%; margin-left: -8px; border-width: 8px 8px 0; border-style: solid; border-color: rgba(0,0,0,0.8) transparent transparent transparent; }
+
+        /* Controls */
+        #bottom-controls { flex-shrink: 0; width: 100%; pointer-events: auto; padding-bottom: env(safe-area-inset-bottom, 0px); position: relative; }
+        .action-bar { display: flex; justify-content: center; align-items: stretch; gap: 6px; pointer-events: auto; width: 100%; }
+        button { background-color: #2c3e50; color: white; border: 2px solid #7f8c8d; padding: 14px 10px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.5); font-family: inherit; min-height: 54px; flex: 1 1 0; transition: 0.1s; }
+        button:active { transform: translateY(2px); box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        #btn-fold { background-color: #641e16; border-color: #922b21; flex: 0.9 1 0; }
+        #btn-call { background-color: #1e641e; border-color: #2b922b; flex: 1.1 1 0; }
+        #btn-raise { background-color: #7d6608; border-color: #b7950b; flex: 1.4 1 0; }
+        #btn-leave { flex: 0.8 1 0; background-color: #333; border-color: #555; }
+        
+        /* Slide-up Raise Panel */
+        #raise-panel {
+            position: fixed;
+            left: 0; right: 0; bottom: 0; width: 100%;
+            background: rgba(20,20,20,0.96);
+            padding: 15px; padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
+            border-top: 2px solid #555; box-sizing: border-box;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            z-index: 25; border-radius: 15px 15px 0 0;
+            transform: translateY(110%); transition: transform 0.28s ease-in-out;
+            pointer-events: none;
+        }
+        #raise-panel.active { transform: translateY(0); pointer-events: auto; }
+        .quick-bets { display: flex; gap: 8px; width: 100%; justify-content: center; }
+        .quick-bets button { flex: 1; min-height: 40px; font-size: 12px; padding: 5px; }
+        .slider-row { display: flex; align-items: center; gap: 10px; width: 100%; justify-content: center; font-weight: bold; font-size: 18px; }
+        input[type=range] { width: 60%; accent-color: #d35400; height: 30px; }
+        #btn-confirm-raise { background-color: #27ae60; border-color: #2ecc71; width: 100%; height: 50px; font-size: 16px; }
+
+        /* Status text above the buttons */
+        #message {
+            position: fixed; left: 50%; bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+            transform: translateX(-50%); width: 92%; max-width: 440px;
+            color: #ffe566; text-align: center; font-size: 16px; font-weight: bold;
+            min-height: 22px; pointer-events: none; z-index: 18;
+            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 0 8px rgba(0,0,0,0.9);
+            line-height: 1.35; letter-spacing: 0.02em;
+        }
+        
+        /* Side Bet Modal */
+        #sidebet-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 50; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; }
+        #sidebet-modal h2 { color: #f1c40f; margin-bottom: 10px; }
+        #sidebet-modal p { font-size: 16px; margin-bottom: 20px; text-align: center; }
+        #sidebet-modal button { width: 80%; max-width: 300px; margin: 10px; font-size: 18px; height: 60px; }
+        #btn-double { background-color: #8e44ad; border-color: #9b59b6; }
+        #btn-cashout { background-color: #2980b9; border-color: #3498db; }
+
+        /* Walking UI */
+        #walking-ui { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; }
+        #joystick-zone { position: absolute; width: 140px; height: 140px; margin: -70px 0 0 -70px; background: radial-gradient(circle, rgba(255,255,255,0.1), rgba(255,255,255,0) 70%); border-radius: 50%; pointer-events: none; border: 2px solid rgba(255,255,255,0.2); display: none; z-index: 15; }
+        #joystick-knob { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; background: rgba(255,255,255,0.4); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+        #walk-actions { position: absolute; bottom: 40px; right: 20px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
+        #interact-prompt { position: absolute; top: 38%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); padding: 12px 22px; border: 1px solid #f1c40f; border-radius: 6px; display: none; pointer-events: auto; cursor: pointer; text-align: center; }
+        #drink-btn { display: none; background-color: #8e44ad; border-color: #9b59b6; }
+
+        /* Fight UI */
+        #fight-ui { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 30; }
+        #fight-ui .hp-bars { position: absolute; top: 18px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 12px; }
+        #fight-ui .hp-box { flex: 1; background: rgba(0,0,0,0.75); border: 1px solid #555; border-radius: 8px; padding: 8px 10px; }
+        #fight-ui .hp-box .label { font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+        #fight-ui .hp-track { height: 14px; background: #222; border-radius: 4px; overflow: hidden; }
+        #fight-ui .hp-fill { height: 100%; width: 100%; transition: width 0.15s; background: linear-gradient(90deg, #c0392b, #e74c3c); }
+        #fight-ui .hp-fill.player { background: linear-gradient(90deg, #1e8449, #2ecc71); }
+        #fight-actions { position: absolute; bottom: calc(24px + env(safe-area-inset-bottom,0px)); left: 0; right: 0; display: flex; justify-content: center; gap: 14px; pointer-events: auto; padding: 0 16px; }
+        #fight-actions button { flex: 1; max-width: 160px; min-height: 56px; font-size: 16px; }
+        #btn-punch { background: #922b21; border-color: #c0392b; }
+        #btn-block { background: #1a5276; border-color: #2980b9; }
+        #fight-bet-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 60; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; }
+        #fight-msg { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); color: #f1c40f; font-weight: bold; font-size: 18px; text-shadow: 0 0 8px #000, 2px 2px 0 #000; text-align: center; width: 90%; pointer-events: none; }
+        
+        #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 9; opacity: 0; background: radial-gradient(ellipse at center, transparent 35%, rgba(20,0,30,0.85) 100%); transition: opacity 0.3s; }
+
+        /* Bartender Modal */
+        #dialogue-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); pointer-events: auto; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+        .dialogue-box { background: #1a1a1a; border: 2px solid #444; padding: 22px; border-radius: 10px; text-align: center; width: 85%; max-width: 380px; }
+        .dialogue-box h2 { color: #e74c3c; margin-top: 0; font-size: 20px; }
+        .dialogue-box p { color: #ddd; font-size: 14px; margin-bottom: 18px; line-height: 1.4; }
+        .dialogue-box button { margin: 6px 0; width: 100%; }
+
+        /* HAND COMPLETED OVERLAY (Far Cry 3 Style) */
+        #showdown-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); z-index: 200; flex-direction: column; align-items: center; justify-content: center; font-family: 'Arial', sans-serif; }
+        .sd-container { width: 92%; max-width: 500px; background: #000; border: 2px solid #333; padding: 15px; box-shadow: 0 0 20px rgba(0, 255, 255, 0.1); position: relative; }
+        .sd-header { color: #00d2ff; font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 15px; text-transform: uppercase; text-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }
+        .sd-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 8px; border-bottom: 1px solid #222; }
+        .sd-row.winner { background: rgba(0, 210, 255, 0.1); border-left: 4px solid #00d2ff; }
+        .sd-info { flex: 1; text-align: right; padding-right: 15px; }
+        .sd-name { color: #fff; font-size: 15px; font-weight: bold; }
+        .sd-hand { color: #ccc; font-size: 13px; margin-top: 4px; }
+        .sd-cards { display: flex; gap: 3px; }
+        .sd-card { width: 36px; height: 54px; background: #fff; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #000; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .sd-card.red { color: #e74c3c; }
+        .sd-card span { font-size: 18px; }
+        #btn-continue-sd { background: transparent; border: 2px solid #00d2ff; color: #00d2ff; padding: 10px 25px; font-size: 16px; margin-top: 15px; cursor: pointer; border-radius: 5px; font-weight: bold; transition: 0.2s; width: auto; }
+        #btn-continue-sd:active { background: #00d2ff; color: #000; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<div id="ui-layer">
+    <div id="poker-ui">
+        <div class="top-bar">
+            <div>YOU: $<span id="chips-0">500</span></div>
+            <div>HOYT: $<span id="chips-1">500</span></div>
+            <div class="pot-label">POT: $<span id="pot">0</span></div>
+            <div>BUCK: $<span id="chips-2">500</span></div>
+            <div>RILEY: $<span id="chips-3">500</span></div>
+        </div>
+        <div style="text-align: center; position: relative; flex: 1; min-height: 0;">
+            <div id="hoyt-dialogue"></div>
+        </div>
+        <div id="message">Place your bet...</div>
+        <div id="bottom-controls">
+            <div class="action-bar" id="action-bar-container"></div>
+            
+            <!-- Slide Up Raise Panel -->
+            <div id="raise-panel">
+                <div class="quick-bets">
+                    <button onclick="setBet('min')">Min</button>
+                    <button onclick="setBet('half')">1/2 Pot</button>
+                    <button onclick="setBet('pot')">Pot</button>
+                    <button onclick="setBet('allin')">All In</button>
+                </div>
+                <div class="slider-row">
+                    <span>$</span>
+                    <input type="range" id="raise-slider" min="20" max="500" step="10" value="50" oninput="updateRaiseDisplay()">
+                    <span id="raise-display">50</span>
+                </div>
+                <button id="btn-confirm-raise" onclick="confirmRaise()">CONFIRM RAISE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Walking UI -->
+    <div id="walking-ui">
+        <div id="joystick-zone"><div id="joystick-knob"></div></div>
+        <div id="interact-prompt">
+            <span style="color: #f1c40f; font-weight: bold;">TAP TO INTERACT</span><br><span id="interact-label">Bartender</span>
+        </div>
+        <div id="walk-actions">
+            <button id="drink-btn" onclick="consumeDrink()">DRINK</button>
+            <button onclick="returnToTable()" style="background-color: #2980b9;">SIT DOWN</button>
+        </div>
+    </div>
+
+    <!-- Fight HUD (inside ui-layer) -->
+    <div id="fight-ui">
+        <div class="hp-bars">
+            <div class="hp-box">
+                <div class="label">YOU</div>
+                <div class="hp-track"><div class="hp-fill player" id="hp-player"></div></div>
+            </div>
+            <div class="hp-box">
+                <div class="label" id="fight-enemy-name">OPPONENT</div>
+                <div class="hp-track"><div class="hp-fill" id="hp-enemy"></div></div>
+            </div>
+        </div>
+        <div id="fight-msg"></div>
+        <div id="fight-actions">
+            <button id="btn-block" onclick="fightBlock()">BLOCK</button>
+            <button id="btn-punch" onclick="fightPunch()">PUNCH</button>
+        </div>
+    </div>
+</div>
+
+<!-- HAND COMPLETED OVERLAY -->
+<div id="showdown-overlay">
+    <div class="sd-container">
+        <div class="sd-header">HAND COMPLETED</div>
+        <div id="sd-rows-container"></div>
+        <div style="text-align: center;">
+            <button id="btn-continue-sd" onclick="dismissShowdown()">CONTINUE</button>
+        </div>
+    </div>
+</div>
+
+<!-- Side Bet Modal -->
+<div id="sidebet-modal">
+    <h2>Double or Nothing?</h2>
+    <p>You just won a big hand.<br>Risk your entire stack of <span id="sidebet-amount" style="color:#4cd137;">$0</span> on a coin flip?</p>
+    <button id="btn-double" onclick="takeSideBet(true)">FLIP THE COIN</button>
+    <button id="btn-cashout" onclick="takeSideBet(false)">CASH OUT & CONTINUE</button>
+</div>
+
+<!-- Fight bet modal -->
+<div id="fight-bet-modal">
+    <div class="dialogue-box">
+        <h2>The Ring</h2>
+        <p id="fight-bet-text">"Step in. Put money on it."</p>
+        <button onclick="startFight(25)">Bet $25</button>
+        <button onclick="startFight(50)">Bet $50</button>
+        <button onclick="startFight(100)">Bet $100</button>
+        <button onclick="closeFightBet()" style="background-color:#641e16;margin-top:12px;">Back off</button>
+    </div>
+</div>
+
+<!-- Bartender Modal -->
+<div id="dialogue-modal">
+    <div class="dialogue-box">
+        <h2>Bartender</h2>
+        <p id="bartender-text">"What'll it be? You look like you're losing."</p>
+        <button onclick="buyDrink('water', 10)" id="btn-buy-water">Water ($10) - Sober Up</button>
+        <button onclick="buyDrink('beer', 25)" id="btn-buy-beer">Beer ($25) - Light Buzz</button>
+        <button onclick="buyDrink('whiskey', 50)" id="btn-buy-whiskey">Whiskey ($50) - Heavy Drunk</button>
+        <button onclick="closeDialogue()" style="background-color: #641e16; margin-top: 15px;">Leave</button>
+    </div>
+</div>
+
+<div id="vignette"></div>
+
+<script>
+(function() {
+    // --- GAME STATE & STORAGE (4-player Texas Hold'em) ---
+    let savedChips = localStorage.getItem('fc3_playerChips');
+    let startChips = savedChips ? parseInt(savedChips) : 500;
+
+    // Seat layout: 0=You (bottom), 1=Hoyt (top), 2=Buck (left), 3=Riley (right)
+    function makePlayer(id, name, chips, isHuman, isHoyt) {
+        return {
+            id, name, chips, isHuman: !!isHuman, isHoyt: !!isHoyt,
+            hand: [], bet: 0, folded: false, allIn: false, inHand: true
+        };
+    }
+
+    let game = {
+        players: [
+            makePlayer(0, 'YOU', startChips, true, false),
+            makePlayer(1, 'HOYT', 500, false, true),
+            makePlayer(2, 'BUCK', 500, false, false),
+            makePlayer(3, 'RILEY', 500, false, false)
+        ],
+        pot: 0,
+        currentBet: 0,
+        phase: 'pre-flop',
+        community: [],
+        deck: [],
+        isHandOver: false,
+        drunkLevel: 0,
+        hasDrink: false,
+        mode: 'poker',
+        dealerIndex: 3,          // rotates each hand
+        actionIndex: 0,          // whose turn
+        lastRaiser: -1,
+        actedSinceRaise: 0,      
+        needPlayersToAct: 0,
+        humanWonPot: false
+    };
+
+    function human() { return game.players[0]; }
+    function activePlayers() { return game.players.filter(p => p.inHand && !p.folded && p.chips + p.bet > 0); }
+    function playersInHand() { return game.players.filter(p => p.inHand && !p.folded); }
+
+    const suits = ['h', 'd', 'c', 's'];
+    const ranks = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+    const suitColors = { h: '#e74c3c', d: '#e74c3c', c: '#000', s: '#000' };
+    const suitSymbols = { h: '♥', d: '♦', c: '♣', s: '♠' };
+
+    // --- SCENE SETUP ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0a);
+    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.025);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 6.8, 8.4);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.domElement.style.position = "fixed";
+    renderer.domElement.style.top = "0";
+    renderer.domElement.style.left = "0";
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
+    renderer.domElement.style.zIndex = "1";
+    document.body.appendChild(renderer.domElement);
+
+    function onWindowResize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', onWindowResize);
+    window.addEventListener('orientationchange', () => setTimeout(onWindowResize, 150));
+
+    // --- LIGHTING ---
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.4));
+    
+    const tableLight = new THREE.SpotLight(0xffddbb, 1.6);
+    tableLight.position.set(0, 10, 3);
+    tableLight.angle = Math.PI / 3;
+    tableLight.penumbra = 0.6;
+    tableLight.castShadow = true;
+    scene.add(tableLight);
+
+    const barLight = new THREE.PointLight(0xffaa55, 1.2, 22);
+    barLight.position.set(10, 4, -5);
+    scene.add(barLight);
+
+    // --- ENVIRONMENT & TEXTURES ---
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1b3b22';
+    ctx.fillRect(0, 0, 512, 512);
+    for(let i=0; i<200; i++) {
+        ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.1})`;
+        ctx.beginPath();
+        ctx.arc(Math.random()*512, Math.random()*512, Math.random()*20, 0, Math.PI*2);
+        ctx.fill();
+    }
+    const tableTexture = new THREE.CanvasTexture(canvas);
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+    floor.rotation.x = -Math.PI / 2; floor.position.y = -2; floor.receiveShadow = true; scene.add(floor);
+
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(40, 20, 1), new THREE.MeshPhongMaterial({ color: 0x1a1008 }));
+    backWall.position.set(0, 5, -15); backWall.receiveShadow = true; scene.add(backWall);
+
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(12, 2, 4), new THREE.MeshPhongMaterial({ color: 0x2c1e16 }));
+    bar.position.set(10, 0, -8); bar.castShadow = true; bar.receiveShadow = true; scene.add(bar);
+
+    const table = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 0.5, 64), new THREE.MeshPhongMaterial({ map: tableTexture }));
+    table.receiveShadow = true; scene.add(table);
+    
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(4.5, 0.4, 16, 100), new THREE.MeshPhongMaterial({ color: 0x2a1b14 }));
+    rim.rotation.x = Math.PI / 2; rim.position.y = 0.25; rim.castShadow = true; rim.receiveShadow = true; scene.add(rim);
+
+    // Ashtray
+    const ashtray = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.3, 0.15, 16), new THREE.MeshPhongMaterial({ color: 0x222222 }));
+    ashtray.position.set(-1.5, 0.6, -1.5); scene.add(ashtray);
+    const deadCig = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 8), new THREE.MeshPhongMaterial({ color: 0xeeeeee }));
+    deadCig.position.set(-1.5, 0.65, -1.5); deadCig.rotation.z = Math.PI/2; scene.add(deadCig);
+
+    // --- BOXING RING ---
+    const ringCenter = new THREE.Vector3(-9, 0, 3);
+    const ringFloor = new THREE.Mesh(new THREE.BoxGeometry(7, 0.25, 7), new THREE.MeshPhongMaterial({ color: 0x5a1a1a }));
+    ringFloor.position.copy(ringCenter); ringFloor.position.y = -0.1; ringFloor.receiveShadow = true; scene.add(ringFloor);
+    const ringMat = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.08, 6.2), new THREE.MeshPhongMaterial({ color: 0xeeeeee }));
+    ringMat.position.set(ringCenter.x, 0.05, ringCenter.z); scene.add(ringMat);
+    const postMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const ropeMat = new THREE.MeshPhongMaterial({ color: 0xcc2222 });
+    const corners = [[-3, -3], [-3, 3], [3, -3], [3, 3]];
+    corners.forEach(([dx, dz]) => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 8), postMat);
+        post.position.set(ringCenter.x + dx, 1.1, ringCenter.z + dz); scene.add(post);
+    });
+    [0.6, 1.1, 1.6].forEach(h => {
+        const rope = new THREE.Mesh(new THREE.TorusGeometry(4.15, 0.04, 6, 24), ropeMat);
+        rope.position.set(ringCenter.x, h, ringCenter.z); rope.rotation.x = Math.PI / 2; scene.add(rope);
+    });
+    const ringLight = new THREE.PointLight(0xffeedd, 0.9, 14);
+    ringLight.position.set(ringCenter.x, 5, ringCenter.z); scene.add(ringLight);
+
+    // --- CHARACTERS ---
+    function createHuman(x, z, skinColor, style) {
+        const group = new THREE.Group();
+        group.position.set(x, -0.85, z);
+        const isBartender = style === 'bartender';
+
+        const skinMat = new THREE.MeshPhongMaterial({ color: skinColor });
+        const blackMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a });
+        const whiteMat = new THREE.MeshPhongMaterial({ color: 0xf5f5f5 });
+        const redMat = new THREE.MeshPhongMaterial({ color: 0x8b0000 });
+        const oliveMat = new THREE.MeshPhongMaterial({ color: 0x3d4f2f });
+        const denimMat = new THREE.MeshPhongMaterial({ color: 0x2c3e50 });
+        const brownMat = new THREE.MeshPhongMaterial({ color: 0x4a3728 });
+
+        let torsoMat = blackMat; let sleeveMat = blackMat;
+        if (style === 'buck') { torsoMat = oliveMat; sleeveMat = oliveMat; }
+        if (style === 'riley') { torsoMat = denimMat; sleeveMat = denimMat; }
+        if (isBartender) { torsoMat = whiteMat; sleeveMat = whiteMat; }
+
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.72, 1.35, 12), torsoMat);
+        torso.position.y = 1.55; torso.castShadow = true; group.add(torso);
+
+        if (style === 'hoyt') {
+            const collarL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.35, 0.12), whiteMat);
+            collarL.position.set(-0.22, 2.15, 0.55); collarL.rotation.z = 0.25; group.add(collarL);
+            const collarR = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.35, 0.12), whiteMat);
+            collarR.position.set(0.22, 2.15, 0.55); collarR.rotation.z = -0.25; group.add(collarR);
+            const lapel = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.08), blackMat);
+            lapel.position.set(0, 1.85, 0.58); group.add(lapel);
+            const tie = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.65, 0.08), redMat);
+            tie.position.set(0, 1.85, 0.68); group.add(tie);
+            const gold = new THREE.MeshPhongMaterial({ color: 0xffd700, shininess: 120 });
+            [1.55, 1.35].forEach(yy => {
+                const b = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), gold);
+                b.position.set(0.18, yy, 0.72); group.add(b);
+            });
+        } else if (style === 'buck') {
+            const strap = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.08), brownMat);
+            strap.position.set(-0.35, 1.7, 0.6); group.add(strap);
+            const strap2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.08), brownMat);
+            strap2.position.set(0.35, 1.7, 0.6); group.add(strap2);
+            const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.25, 0.2), brownMat);
+            pouch.position.set(0.4, 1.3, 0.55); group.add(pouch);
+        } else if (style === 'riley') {
+            const tee = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.65, 0.9, 12), whiteMat);
+            tee.position.y = 1.7; group.add(tee);
+            const jacket = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.74, 1.1, 12), denimMat);
+            jacket.position.y = 1.45; group.add(jacket);
+        } else if (isBartender) {
+            const vest = new THREE.Mesh(new THREE.CylinderGeometry(0.64, 0.74, 1.05, 12), new THREE.MeshPhongMaterial({ color: 0x2c2c2c }));
+            vest.position.y = 1.55; group.add(vest);
+        }
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 24), skinMat);
+        head.position.y = 2.65; head.scale.set(1, 1.08, 0.95); head.castShadow = true; group.add(head);
+
+        const earL = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), skinMat);
+        earL.position.set(-0.4, 2.65, 0); earL.scale.set(0.5, 1, 0.8); group.add(earL);
+        const earR = earL.clone(); earR.position.x = 0.4; group.add(earR);
+
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.2, 8), skinMat);
+        nose.position.set(0, 2.6, 0.4); nose.rotation.x = Math.PI / 2; group.add(nose);
+
+        const eyeGeo = new THREE.SphereGeometry(0.07, 8, 8);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const pupilGeo = new THREE.SphereGeometry(0.035, 8, 8);
+        const pupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+        const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.13, 2.72, 0.38); group.add(eyeL);
+        const pupL = new THREE.Mesh(pupilGeo, pupilMat); pupL.position.set(-0.13, 2.72, 0.44); group.add(pupL);
+        const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.13, 2.72, 0.38); group.add(eyeR);
+        const pupR = new THREE.Mesh(pupilGeo, pupilMat); pupR.position.set(0.13, 2.72, 0.44); group.add(pupR);
+
+        const upperArmGeo = new THREE.CylinderGeometry(0.16, 0.18, 0.7, 8);
+        const forearmGeo = new THREE.CylinderGeometry(0.13, 0.15, 0.55, 8);
+        const armL = new THREE.Group();
+        const uL = new THREE.Mesh(upperArmGeo, sleeveMat); uL.position.y = -0.2; armL.add(uL);
+        const fL = new THREE.Mesh(forearmGeo, skinMat); fL.position.set(0, -0.7, 0.15); fL.rotation.x = -0.4; armL.add(fL);
+        armL.position.set(-0.8, 2.0, 0.15); armL.rotation.z = 0.25; armL.rotation.x = 0.3; group.add(armL);
+        const armR = new THREE.Group();
+        const uR = new THREE.Mesh(upperArmGeo, sleeveMat); uR.position.y = -0.2; armR.add(uR);
+        const fR = new THREE.Mesh(forearmGeo, skinMat); fR.position.set(0, -0.7, 0.15); fR.rotation.x = -0.4; armR.add(fR);
+        armR.position.set(0.8, 2.0, 0.15); armR.rotation.z = -0.25; armR.rotation.x = 0.3; group.add(armR);
+
+        const handL = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), skinMat);
+        handL.position.set(-0.75, 1.15, 0.55); handL.scale.set(1, 0.6, 1.2); group.add(handL);
+        const handR = handL.clone(); handR.position.x = 0.75; group.add(handR);
+
+        if (isBartender) {
+            const mustache = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.08), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+            mustache.position.set(0, 2.5, 0.4); group.add(mustache);
+        } else if (style === 'hoyt') {
+            const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.06, 24), blackMat);
+            brim.position.y = 3.05; group.add(brim);
+            const top = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.4, 0.45, 24), blackMat);
+            top.position.y = 3.3; group.add(top);
+            const cigar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.45, 8), brownMat);
+            cigar.position.set(0.22, 2.48, 0.48); cigar.rotation.x = Math.PI / 3; group.add(cigar);
+            const ember = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3300 }));
+            ember.position.set(0.22, 2.6, 0.65); group.add(ember);
+            setInterval(() => { ember.material.color.setRGB(0.8 + Math.random() * 0.4, 0.15, 0); }, 150);
+        } else if (style === 'buck') {
+            const cap = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), oliveMat);
+            cap.position.y = 2.95; group.add(cap);
+            const bill = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.05, 0.3), oliveMat);
+            bill.position.set(0, 2.88, 0.35); group.add(bill);
+            const stub = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.08), new THREE.MeshBasicMaterial({ color: 0x3a2a1a }));
+            stub.position.set(0, 2.45, 0.38); group.add(stub);
+        } else if (style === 'riley') {
+            const hair = new THREE.Mesh(new THREE.SphereGeometry(0.44, 12, 12), new THREE.MeshPhongMaterial({ color: 0x2a1a0a }));
+            hair.position.y = 2.85; hair.scale.set(1, 0.7, 1); group.add(hair);
+        }
+
+        scene.add(group);
+        return { group, pupL, pupR, armL, armR };
+    }
+
+    const hoytObj = createHuman(0, -3.6, 0xe0ac69, 'hoyt');
+    const aiCharacter = hoytObj.group;
+    aiCharacter.scale.set(1.12, 1.18, 1.12);
+
+    const buckObj = createHuman(-3.4, -0.4, 0xc68642, 'buck');
+    const buckChar = buckObj.group;
+    buckChar.scale.set(1.08, 1.12, 1.08);
+    buckChar.rotation.y = Math.PI * 0.5;
+
+    const rileyObj = createHuman(3.4, -0.4, 0xd4a574, 'riley');
+    const rileyChar = rileyObj.group;
+    rileyChar.scale.set(1.05, 1.1, 1.05);
+    rileyChar.rotation.y = -Math.PI * 0.5;
+
+    const seatChars = [null, aiCharacter, buckChar, rileyChar]; 
+    
+    const bartenderObj = createHuman(10, -7.2, 0xd4a373, 'bartender');
+    const bartender = bartenderObj.group;
+    bartender.scale.set(1.15, 1.25, 1.15);
+
+    // --- SMOKE ---
+    const smokeParticles = [];
+    const smokeGeo = new THREE.SphereGeometry(0.04, 6, 6);
+    const smokeMat = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.35, depthWrite: false });
+    
+    function spawnCigarSmoke() {
+        const p = new THREE.Mesh(smokeGeo, smokeMat.clone());
+        const base = aiCharacter.position.clone();
+        p.position.set(base.x + 0.3 + (Math.random() - 0.5) * 0.1, base.y + 2.9 + Math.random() * 0.1, base.z + 0.7 + (Math.random() - 0.5) * 0.1);
+        p.userData = { life: 1.8 + Math.random() * 0.8, maxLife: 2.2, vy: 0.35 + Math.random() * 0.25, vx: (Math.random() - 0.5) * 0.15, vz: (Math.random() - 0.5) * 0.1 };
+        scene.add(p); smokeParticles.push(p);
+    }
+    setInterval(() => { if (smokeParticles.length < 25) spawnCigarSmoke(); }, 250);
+
+    // --- BOTTLE ---
+    const bottleGroup = new THREE.Group();
+    bottleGroup.visible = false; bottleGroup.position.set(0.42, -0.32, -0.95); bottleGroup.rotation.set(0.15, -0.25, 0.1); bottleGroup.scale.set(1.55, 1.55, 1.55);
+    camera.add(bottleGroup); scene.add(camera);
+
+    const glassMat = new THREE.MeshPhongMaterial({ color: 0xaaddff, transparent: true, opacity: 0.5, shininess: 120 });
+    const whiskeyMat = new THREE.MeshPhongMaterial({ color: 0xd4af37, transparent: true, opacity: 0.95 });
+
+    const fpArms = new THREE.Group();
+    fpArms.visible = false;
+    const skinFP = new THREE.MeshPhongMaterial({ color: 0xe0ac69 });
+    const sleeveFP = new THREE.MeshPhongMaterial({ color: 0x2c3e50 });
+    function makeFPArm(side) {
+        const g = new THREE.Group();
+        const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.45, 8), sleeveFP);
+        upper.rotation.x = Math.PI / 2; upper.position.z = -0.2; g.add(upper);
+        const fist = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 10), skinFP);
+        fist.position.z = -0.48; fist.scale.set(1.1, 0.9, 1.2); g.add(fist);
+        g.position.set(side * 0.35, -0.28, -0.55); g.rotation.x = 0.15;
+        g.userData.base = { x: side * 0.35, y: -0.28, z: -0.55, rx: 0.15 };
+        return g;
+    }
+    const fpArmL = makeFPArm(-1); const fpArmR = makeFPArm(1);
+    fpArms.add(fpArmL); fpArms.add(fpArmR); camera.add(fpArms);
+
+    const bottleBody = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.58, 16), glassMat); bottleGroup.add(bottleBody);
+    const bottleNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.1, 0.3, 16), glassMat); bottleNeck.position.set(0, 0.4, 0); bottleGroup.add(bottleNeck);
+    const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.45, 16), whiskeyMat); liquid.position.set(0, -0.03, 0); bottleGroup.add(liquid);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.08, 12), new THREE.MeshPhongMaterial({ color: 0x222222 })); cap.position.set(0, 0.58, 0); bottleGroup.add(cap);
+
+    // --- CARDS & CHIPS ---
+    const chipGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.1, 16);
+    const chipMats = { red: new THREE.MeshPhongMaterial({ color: 0xc0392b }), black: new THREE.MeshPhongMaterial({ color: 0x111111 }) };
+    let activeChips = [];
+    let activeCards = [];
+
+    function createCardTexture(rank, suit) {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 356;
+        const cx = c.getContext('2d');
+        cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, 256, 356);
+        cx.strokeStyle = '#aaaaaa'; cx.lineWidth = 8; cx.strokeRect(0, 0, 256, 356);
+        cx.fillStyle = suitColors[suit]; cx.font = 'bold 80px Arial'; cx.textAlign = 'center';
+        cx.fillText(rank, 50, 80); cx.font = '140px Arial';
+        cx.fillText(suitSymbols[suit], 128, 220);
+        return new THREE.CanvasTexture(c);
+    }
+    const cardBackTex = (() => {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 356;
+        const cx = c.getContext('2d'); cx.fillStyle = '#8b0000'; cx.fillRect(0, 0, 256, 356);
+        cx.strokeStyle = '#ffffff'; cx.lineWidth = 12; cx.strokeRect(8, 8, 240, 340);
+        return new THREE.CanvasTexture(c);
+    })();
+    const cardGeo = new THREE.BoxGeometry(1, 0.05, 1.4);
+    const cardBackMat = new THREE.MeshPhongMaterial({ map: cardBackTex });
+
+    function clearTableCards() {
+        for (let i = scene.children.length - 1; i >= 0; i--) {
+            const obj = scene.children[i];
+            if (obj.userData && (obj.userData.isCard || obj.userData.isCommunity)) {
+                scene.remove(obj); if (obj.geometry) obj.geometry.dispose(); if (obj.material) { if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose && m.dispose()); else if (obj.material.dispose) obj.material.dispose(); }
+            }
+        }
+        activeCards = [];
+    }
+
+    // --- CONTROLS ---
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let velocity = new THREE.Vector3(), direction = new THREE.Vector3(), prevTime = performance.now();
+    let lookId = null, stickId = null, lastLook = { x: 0, y: 0 };
+    let euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    let moveVec = { x: 0, y: 0 };
+
+    const joystickZone = document.getElementById('joystick-zone');
+    const joystickKnob = document.getElementById('joystick-knob');
+
+    document.addEventListener('touchstart', (e) => {
+        if (game.mode !== 'walking') return;
+        const t = e.target;
+        if (t.tagName === 'BUTTON' || t.closest('button') || t.id === 'interact-prompt') return;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.clientX < window.innerWidth * 0.45 && stickId === null) {
+                stickId = touch.identifier; joystickZone.style.display = 'block';
+                joystickZone.style.left = touch.clientX + 'px'; joystickZone.style.top = touch.clientY + 'px';
+                joystickKnob.style.transform = 'translate(-50%, -50%)'; moveVec.x = 0; moveVec.y = 0;
+            } else if (lookId === null) {
+                lookId = touch.identifier; lastLook.x = touch.clientX; lastLook.y = touch.clientY;
+            }
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        if (game.mode !== 'walking') return;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier === stickId) {
+                let dx = touch.clientX - parseFloat(joystickZone.style.left);
+                let dy = touch.clientY - parseFloat(joystickZone.style.top);
+                const len = Math.hypot(dx, dy); const maxR = 55;
+                if (len > maxR) { dx = (dx / len) * maxR; dy = (dy / len) * maxR; }
+                joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                moveVec.x = dx / maxR; moveVec.y = -dy / maxR;
+                const th = 0.45; 
+                moveForward = moveVec.y > th; moveBackward = moveVec.y < -th;
+                moveLeft = moveVec.x < -th; moveRight = moveVec.x > th;
+            } else if (touch.identifier === lookId) {
+                const dx = touch.clientX - lastLook.x; const dy = touch.clientY - lastLook.y;
+                lastLook.x = touch.clientX; lastLook.y = touch.clientY;
+                euler.setFromQuaternion(camera.quaternion);
+                euler.y -= dx * 0.0045; euler.x -= dy * 0.0045;
+                euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, euler.x));
+                camera.quaternion.setFromEuler(euler);
+            }
+        }
+    }, { passive: true });
+
+    function endTouch(e) {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const id = e.changedTouches[i].identifier;
+            if (id === stickId) { stickId = null; joystickZone.style.display = 'none'; joystickKnob.style.transform = 'translate(-50%, -50%)'; moveForward = moveBackward = moveLeft = moveRight = false; moveVec.x = 0; moveVec.y = 0; }
+            if (id === lookId) lookId = null;
+        }
+    }
+    document.addEventListener('touchend', endTouch);
+    document.addEventListener('touchcancel', endTouch);
+
+    // --- PERSONALITY DIALOGUE ---
+    const VOICE = {
+        HOYT: {
+            raise: ["Let's make it interesting.", "You're bluffing.", "I own this table.", "Put your money where your mouth is.", "Cute. Raise."],
+            fold: ["Lucky.", "I'll let you have this one.", "Not worth my time.", "Take the scraps."],
+            win: ["Read 'em and weep, Jason.", "Predictable.", "This island runs on people like you.", "Sit down. Stay down."],
+            lose: ["Pathetic.", "Enjoy it while it lasts.", "A glitch. Nothing more.", "Don't get comfortable."],
+            allin: ["All of it.", "Everything on the line.", "No half measures."],
+            fight: ["You want a real game?", "The ring doesn't lie.", "Bleed for it."]
+        },
+        BUCK: {
+            raise: ["Ha! Let's dance.", "Come on, big shot.", "I smell blood.", "Pay up, tourist.", "This is my hand."],
+            fold: ["Whatever.", "Not today.", "Keep your coins.", "Boring."],
+            win: ["Told you.", "Easy money.", "Next!", "You play like a rookie."],
+            lose: ["Tch. Fine.", "Got lucky.", "Round two later.", "Don't smile at me."],
+            allin: ["Shove it!", "All in, baby!", "Let's end this."],
+            fight: ["You look soft.", "Ring. Now.", "I break tourists for fun."]
+        },
+        RILEY: {
+            raise: ["Uh… raising.", "I think I've got this.", "Don't make me regret it.", "Okay. Okay. Raise.", "Feeling lucky for once."],
+            fold: ["Nope. I'm out.", "Too rich for me.", "Fold. Smart fold.", "Not dying on this hand."],
+            win: ["Yes! Finally!", "Did you see that?", "That's more like it.", "Maybe I belong here."],
+            lose: ["Of course…", "I knew it.", "This table hates me.", "One more. Just one more."],
+            allin: ["Everything! Why not!", "I'm all in. Don't laugh.", "Here goes nothing."],
+            fight: ["I… I can fight.", "The ring? Seriously?", "Fine. Don't kill me."]
+        }
+    };
+    const usedLines = { HOYT: {}, BUCK: {}, RILEY: {} };
+
+    function pickLine(who, category) {
+        const pool = (VOICE[who] && VOICE[who][category]) ? VOICE[who][category] : [];
+        if (!pool.length) return null;
+        if (!usedLines[who][category]) usedLines[who][category] = new Set();
+        const used = usedLines[who][category];
+        let options = pool.filter(l => !used.has(l));
+        if (!options.length) { used.clear(); options = pool.slice(); }
+        const line = options[Math.floor(Math.random() * options.length)];
+        used.add(line);
+        return line;
+    }
+
+    function characterSay(who, text) {
+        if (!text) return;
+        const el = document.getElementById('message');
+        if (!el) return;
+        const colors = { HOYT: '#ff6b5a', BUCK: '#f39c12', RILEY: '#5dade2' };
+        const c = colors[who] || '#f1c40f';
+        el.innerHTML = `<span style="color:${c}">${who}:</span> "${text}"`;
+        el.style.fontSize = '15px'; el.style.color = '#ffe566';
+        const bubble = document.getElementById('hoyt-dialogue');
+        if (bubble) bubble.style.opacity = '0';
+    }
+
+    function speak(who, category) {
+        const line = pickLine(who, category);
+        if (line) characterSay(who, line);
+    }
+
+    // --- FIGHT STATE ---
+    let fight = {
+        active: false, bet: 0, playerHp: 100, enemyHp: 100,
+        enemyName: 'BUCK', enemySeat: 2, playerBlocking: false, enemyBlocking: false,
+        busy: false, enemyChar: null, playerCooldown: 0, enemyCooldown: 0, hitFlash: 0
+    };
+
+    // --- GAME LOGIC ---
+    function startGame() {
+        const prevDrunk = game.drunkLevel;
+        const prevDrink = game.hasDrink;
+        const prevDealer = (game.dealerIndex + 1) % 4;
+        const chipSave = game.players.map(p => Math.max(0, p.chips));
+        
+        for (let i = 0; i < 4; i++) { if (chipSave[i] <= 0) chipSave[i] = 500; }
+        try {
+            const s = localStorage.getItem('fc3_playerChips');
+            if (s && parseInt(s, 10) > 0) chipSave[0] = parseInt(s, 10);
+        } catch (e) {}
+
+        game.players = [
+            makePlayer(0, 'YOU', chipSave[0], true, false),
+            makePlayer(1, 'HOYT', chipSave[1], false, true),
+            makePlayer(2, 'BUCK', chipSave[2], false, false),
+            makePlayer(3, 'RILEY', chipSave[3], false, false)
+        ];
+        game.pot = 0; game.currentBet = 0; game.phase = 'pre-flop';
+        game.community = []; game.deck = createDeck(); game.isHandOver = false;
+        game.drunkLevel = prevDrunk; game.hasDrink = prevDrink; game.mode = 'poker';
+        game.dealerIndex = prevDealer; game.actionIndex = 0; game.lastRaiser = -1;
+        game.actedSinceRaise = 0; game.needPlayersToAct = 0; game.humanWonPot = false;
+
+        clearTableCards();
+        activeChips.forEach(c => scene.remove(c)); activeChips = [];
+        
+        document.getElementById('poker-ui').style.display = 'flex';
+        document.getElementById('walking-ui').style.display = 'none';
+        document.getElementById('raise-panel').classList.remove('active');
+        document.getElementById('showdown-overlay').style.display = 'none';
+        bottleGroup.visible = false;
+
+        camera.position.set(0, 6.8, 8.4); camera.lookAt(0, 0.15, 0);
+        euler.set(0, 0, 0); camera.quaternion.setFromEuler(euler);
+
+        const btnArea = document.getElementById('action-bar-container');
+        btnArea.innerHTML = `
+            <button id="btn-fold" onclick="playerAction('fold')">Fold</button>
+            <button id="btn-call" onclick="playerAction('call')">CALL $5</button>
+            <button id="btn-raise" onclick="openRaisePanel()">Raise</button>
+            <button id="btn-leave" onclick="standUp()">Leave</button>
+        `;
+        btnArea.style.pointerEvents = 'none';
+
+        const sbIdx = (game.dealerIndex + 1) % 4;
+        const bbIdx = (game.dealerIndex + 2) % 4;
+        const sbAmt = Math.min(5, game.players[sbIdx].chips);
+        const bbAmt = Math.min(10, game.players[bbIdx].chips);
+        game.players[sbIdx].chips -= sbAmt; game.players[sbIdx].bet = sbAmt;
+        game.players[bbIdx].chips -= bbAmt; game.players[bbIdx].bet = bbAmt;
+        game.pot = sbAmt + bbAmt; game.currentBet = bbAmt; game.lastRaiser = bbIdx;
+        game.actionIndex = (bbIdx + 1) % 4;
+
+        updateUI(); dealHand();
+        setMessage('Dealing...');
+        setTimeout(() => promptCurrentPlayer(), 600);
+    }
+
+    function openRaisePanel() {
+        const p = human();
+        const slider = document.getElementById('raise-slider');
+        slider.max = p.chips + p.bet;
+        let minRaise = game.currentBet + 20;
+        if (minRaise > slider.max) minRaise = slider.max;
+        slider.min = Math.max(minRaise, p.bet);
+        slider.value = slider.min;
+        updateRaiseDisplay();
+        document.getElementById('raise-panel').classList.add('active');
+    }
+
+    function confirmRaise() {
+        document.getElementById('raise-panel').classList.remove('active');
+        const p = human();
+        if (game.actionIndex !== 0 || game.isHandOver || p.folded) return;
+
+        let raiseTotal = parseInt(document.getElementById('raise-slider').value, 10);
+        const maxPossible = p.chips + p.bet;
+        if (raiseTotal > maxPossible) raiseTotal = maxPossible;
+        if (raiseTotal < game.currentBet) raiseTotal = game.currentBet;
+
+        let totalCost = raiseTotal - p.bet;
+        if (totalCost > p.chips) totalCost = p.chips;
+
+        p.chips -= totalCost; game.pot += totalCost; p.bet += totalCost;
+        const wasRaise = p.bet > game.currentBet;
+        game.currentBet = Math.max(game.currentBet, p.bet);
+        if (p.chips === 0) p.allIn = true;
+
+        if (totalCost > 0) spawnChips(new THREE.Vector3(0, 0.6, 3), new THREE.Vector3(0, 0.55, 0.9), totalCost);
+        setMessage(p.allIn ? 'You are ALL IN.' : `You raised to $${game.currentBet}.`);
+        document.getElementById('action-bar-container').style.pointerEvents = 'none';
+        updateUI();
+        afterPlayerActed(0, wasRaise);
+    }
+
+    function seatCardPos(seatIndex, cardIndex) {
+        if (seatIndex === 0) return new THREE.Vector3(-0.9 + cardIndex * 1.8, 0.6, 2.55);
+        if (seatIndex === 1) return new THREE.Vector3(-0.9 + cardIndex * 1.8, 0.6, -2.55);
+        if (seatIndex === 2) return new THREE.Vector3(-3.0, 0.6, -0.5 + cardIndex * 1.0);
+        return new THREE.Vector3(3.0, 0.6, -0.5 + cardIndex * 1.0);
+    }
+
+    function chipSpawnForSeat(seatIndex) {
+        if (seatIndex === 0) return new THREE.Vector3(0, 0.6, 3);
+        if (seatIndex === 1) return new THREE.Vector3(0, 0.6, -3);
+        if (seatIndex === 2) return new THREE.Vector3(-3.2, 0.6, 0);
+        return new THREE.Vector3(3.2, 0.6, 0);
+    }
+
+    function standUp() {
+        game.mode = 'walking';
+        document.getElementById('poker-ui').style.display = 'none';
+        document.getElementById('walking-ui').style.display = 'block';
+        camera.position.set(0, 1.7, 5.5); camera.lookAt(10, 1.8, -7); euler.setFromQuaternion(camera.quaternion);
+        clearTableCards(); activeChips.forEach(c => scene.remove(c)); activeChips = [];
+        
+        if (game.hasDrink) { document.getElementById('drink-btn').style.display = 'block'; bottleGroup.visible = true; }
+        else { document.getElementById('drink-btn').style.display = 'none'; bottleGroup.visible = false; }
+    }
+
+    function returnToTable() {
+        if (game.hasDrink) bottleGroup.visible = false;
+        startGame();
+    }
+
+    // --- BARTENDER & DRINKS ---
+    function openBartenderDialogue() {
+        document.getElementById('dialogue-modal').style.display = 'flex';
+        const hc = human().chips;
+        document.getElementById('btn-buy-water').disabled = hc < 10;
+        document.getElementById('btn-buy-beer').disabled = hc < 25;
+        document.getElementById('btn-buy-whiskey').disabled = hc < 50;
+    }
+    function closeDialogue() { document.getElementById('dialogue-modal').style.display = 'none'; }
+
+    function buyDrink(type, cost) {
+        const p = human();
+        if (p.chips >= cost) {
+            p.chips -= cost; game.hasDrink = true; updateUI();
+            document.getElementById('drink-btn').style.display = 'block';
+            bottleGroup.visible = true;
+            if (type === 'water') { liquid.material.color.setHex(0x88ccff); document.getElementById('bartender-text').innerText = '"Water. Smart man."'; }
+            else if (type === 'beer') { liquid.material.color.setHex(0xf39c12); document.getElementById('bartender-text').innerText = '"Local brew. Cheers."'; }
+            else { liquid.material.color.setHex(0xd4af37); document.getElementById('bartender-text').innerText = '"Top shelf. Go easy."'; }
+            game.drinkType = type;
+            try { localStorage.setItem('fc3_playerChips', p.chips); } catch (e) {}
+            setTimeout(closeDialogue, 1400);
+        }
+    }
+
+    function consumeDrink() {
+        game.hasDrink = false;
+        if (game.drinkType === 'water') { game.drunkLevel = Math.max(0, game.drunkLevel - 1.5); setMessage("You feel sober again."); }
+        else if (game.drinkType === 'beer') { game.drunkLevel = Math.min(game.drunkLevel + 0.4, 2.8); setMessage("Just a slight buzz."); }
+        else { game.drunkLevel = Math.min(game.drunkLevel + 1.2, 2.8); setMessage("The room is spinning..."); }
+        
+        document.getElementById('drink-btn').style.display = 'none';
+        bottleGroup.visible = true;
+        const startRot = bottleGroup.rotation.clone();
+        bottleGroup.rotation.set(-1.1, -0.15, 0.05);
+        setTimeout(() => { bottleGroup.rotation.copy(startRot); bottleGroup.visible = false; }, 650);
+    }
+
+    // --- SIDE BET ---
+    function offerSideBet() {
+        if (human().chips < 50) { endHandSequence(); return; }
+        document.getElementById('sidebet-amount').innerText = "$" + human().chips;
+        document.getElementById('sidebet-modal').style.display = 'flex';
+    }
+
+    function takeSideBet(flip) {
+        document.getElementById('sidebet-modal').style.display = 'none';
+        if (flip) {
+            setMessage("Flipping the coin...");
+            setTimeout(() => {
+                const p = human();
+                if (Math.random() > 0.5) { p.chips *= 2; setMessage("HEADS! You doubled your money!"); }
+                else { p.chips = 0; setMessage("TAILS! You lost it all."); }
+                try { localStorage.setItem('fc3_playerChips', p.chips); } catch (e) {}
+                updateUI(); setTimeout(endHandSequence, 2000);
+            }, 1500);
+        } else { endHandSequence(); }
+    }
+
+    // --- RENDER LOOP ---
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = performance.now();
+        const delta = Math.min((time - prevTime) / 1000, 0.05);
+
+        if (game.drunkLevel > 0) game.drunkLevel = Math.max(0, game.drunkLevel - delta * 0.025);
+        const vig = document.getElementById('vignette');
+        if (vig) vig.style.opacity = Math.min(0.95, game.drunkLevel * 0.55);
+
+        if (aiCharacter) {
+            aiCharacter.position.y = -0.85 + Math.sin(time * 0.002) * 0.03;
+            aiCharacter.rotation.z = Math.sin(time * 0.001) * 0.02;
+            if(hoytObj.pupL && hoytObj.pupR) {
+                const camPos = camera.position;
+                const dx = Math.max(-0.04, Math.min(0.04, (camPos.x - aiCharacter.position.x) * 0.01));
+                hoytObj.pupL.position.x = -0.15 + dx;
+                hoytObj.pupR.position.x = 0.15 + dx;
+            }
+        }
+
+        if (game.mode === 'walking') {
+            velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta;
+            direction.z = Number(moveForward) - Number(moveBackward); direction.x = Number(moveRight) - Number(moveLeft); direction.normalize();
+            if (moveForward || moveBackward) velocity.z -= direction.z * 28.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * 28.0 * delta;
+
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); forward.y = 0; forward.normalize();
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); right.y = 0; right.normalize();
+            
+            camera.position.addScaledVector(forward, -velocity.z * delta); camera.position.addScaledVector(right, -velocity.x * delta);
+            camera.position.y = 1.6 + (game.drunkLevel * Math.sin(time * 0.0015) * 0.15);
+            camera.position.x = Math.max(-14, Math.min(16, camera.position.x)); camera.position.z = Math.max(-11, Math.min(9, camera.position.z));
+
+            const distToBartender = camera.position.distanceTo(new THREE.Vector3(10, 1.6, -7.2));
+            const distToRing = camera.position.distanceTo(ringCenter.clone().setY(1.6));
+            const prompt = document.getElementById('interact-prompt');
+            const label = document.getElementById('interact-label');
+            if (distToRing < 4.5) {
+                prompt.style.display = 'block'; label.innerText = 'The Ring'; prompt.onclick = openFightBet;
+            } else if (distToBartender < 5.2) {
+                prompt.style.display = 'block'; label.innerText = 'Bartender'; prompt.onclick = openBartenderDialogue;
+            } else {
+                prompt.style.display = 'none'; prompt.onclick = null;
+            }
+            
+            if (game.drunkLevel > 0.05) {
+                euler.setFromQuaternion(camera.quaternion);
+                euler.z = Math.sin(time * 0.001) * game.drunkLevel * 0.1;
+                camera.quaternion.setFromEuler(euler);
+            }
+        } else if (game.mode === 'poker') {
+            const baseY = 6.8; const baseZ = 8.4;
+            if (game.drunkLevel > 0.05) {
+                camera.position.x = Math.sin(time * 0.0015) * game.drunkLevel * 0.25;
+                camera.position.y = baseY + Math.cos(time * 0.002) * game.drunkLevel * 0.15;
+                camera.position.z = baseZ;
+            } else { camera.position.set(0, baseY, baseZ); }
+            camera.lookAt(0, 0.15, 0); // Locked camera
+        }
+
+        for (let i = activeChips.length - 1; i >= 0; i--) {
+            let chip = activeChips[i];
+            chip.userData.progress += 0.08;
+            if (chip.userData.progress >= 1) { chip.position.copy(chip.userData.end); chip.position.y = 0.5 + (i % 3) * 0.08; }
+            else {
+                let p = chip.userData.progress;
+                chip.position.lerpVectors(chip.userData.start, chip.userData.end, p);
+                chip.position.y += Math.sin(p * Math.PI) * 1.4;
+            }
+        }
+
+        for (let i = activeCards.length - 1; i >= 0; i--) {
+            let card = activeCards[i];
+            if (card.userData.progress < 1) {
+                card.userData.progress += 0.06;
+                let p = card.userData.progress;
+                card.position.lerpVectors(card.userData.start, card.userData.end, p);
+                card.position.y += Math.sin(p * Math.PI) * 0.5;
+                card.rotation.x = -Math.PI / 2 + (1 - p) * 1.5;
+                if (p >= 1) activeCards.splice(i, 1);
+            }
+        }
+
+        for (let i = smokeParticles.length - 1; i >= 0; i--) {
+            const p = smokeParticles[i];
+            p.userData.life -= delta; p.position.y += p.userData.vy * delta; p.position.x += p.userData.vx * delta; p.position.z += p.userData.vz * delta;
+            p.scale.setScalar(1 + (1 - p.userData.life / p.userData.maxLife) * 2.2);
+            p.material.opacity = Math.max(0, (p.userData.life / p.userData.maxLife) * 0.35);
+            if (p.userData.life <= 0) { scene.remove(p); p.material.dispose(); smokeParticles.splice(i, 1); }
+        }
+
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    // --- POKER MECHANICS ---
+    function createDeck() {
+        let deck = [];
+        for (let s of suits) { for (let r of ranks) { deck.push({ rank: r, suit: s }); } }
+        for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+        return deck;
+    }
+
+    function dealHand() {
+        clearTableCards();
+        for (let s = 0; s < 4; s++) {
+            game.players[s].hand = [game.deck.pop(), game.deck.pop()];
+            game.players[s].hand.forEach((card, index) => {
+                const faceUp = (s === 0);
+                const mat = faceUp ? new THREE.MeshPhongMaterial({ map: createCardTexture(card.rank, card.suit) }) : cardBackMat;
+                const mesh = new THREE.Mesh(cardGeo, faceUp ? [mat, mat, mat, mat, mat, mat] : cardBackMat);
+                const targetPos = seatCardPos(s, index);
+                mesh.position.set(0, 1, 0);
+                mesh.userData = { isCard: true, seat: s, start: new THREE.Vector3(0, 1, 0), end: targetPos, progress: 0 };
+                if (s === 2) mesh.rotation.z = 0.15;
+                if (s === 3) mesh.rotation.z = -0.15;
+                scene.add(mesh); activeCards.push(mesh);
+            });
+        }
+        updateUI();
+    }
+
+    function nextActiveIndex(from) {
+        for (let i = 1; i <= 4; i++) {
+            const idx = (from + i) % 4;
+            const p = game.players[idx];
+            if (!p.folded && !p.allIn && p.inHand) return idx;
+        }
+        return -1;
+    }
+
+    function countToAct() {
+        return game.players.filter(p => !p.folded && !p.allIn && p.inHand).length;
+    }
+
+    function afterPlayerActed(seat, wasRaise) {
+        if (wasRaise) {
+            game.lastRaiser = seat; game.actedSinceRaise = 1; game.needPlayersToAct = countToAct() - 1;
+        } else { game.actedSinceRaise++; }
+
+        const alive = playersInHand();
+        if (alive.length === 1) {
+            awardPotTo([alive[0].id]);
+            setMessage(alive[0].isHuman ? 'Everyone folded. You win!' : `${alive[0].name} wins — everyone folded.`);
+            if (alive[0].isHoyt) hoytSay('Too easy.');
+            game.isHandOver = true;
+            setTimeout(endHandSequence, 1400);
+            return;
+        }
+
+        const stillNeed = game.players.some(p => !p.folded && !p.allIn && p.inHand && p.bet < game.currentBet);
+        const activeCount = countToAct();
+
+        if (!stillNeed && (game.actedSinceRaise >= activeCount || activeCount === 0)) {
+            setTimeout(advancePhase, 700); return;
+        }
+
+        const next = nextActiveIndex(seat);
+        if (next < 0) { setTimeout(advancePhase, 700); return; }
+        game.actionIndex = next;
+        setTimeout(() => promptCurrentPlayer(), 500);
+    }
+
+    function promptCurrentPlayer() {
+        if (game.isHandOver) return;
+        const p = game.players[game.actionIndex];
+        if (!p || p.folded || p.allIn) {
+            const n = nextActiveIndex(game.actionIndex);
+            if (n < 0) { advancePhase(); return; }
+            game.actionIndex = n; promptCurrentPlayer(); return;
+        }
+        updateUI();
+        if (p.isHuman) {
+            const toCall = Math.max(0, game.currentBet - p.bet);
+            document.getElementById('action-bar-container').style.pointerEvents = 'auto';
+            if (toCall === 0) setMessage('Your turn. Check or raise.');
+            else setMessage(`Your turn. Call $${toCall} or raise.`);
+        } else {
+            document.getElementById('action-bar-container').style.pointerEvents = 'none';
+            setMessage(`${p.name} is thinking...`);
+            setTimeout(() => runAI(p.id), 700 + Math.random() * 800);
+        }
+    }
+
+    function awardPotTo(winnerIds) {
+        const potAmount = Math.max(0, game.pot | 0);
+        if (!winnerIds.length || potAmount <= 0) { game.pot = 0; return; }
+        const share = Math.floor(potAmount / winnerIds.length);
+        let left = potAmount;
+        winnerIds.forEach((id, i) => {
+            const give = (i === winnerIds.length - 1) ? left : share;
+            game.players[id].chips += give;
+            left -= give;
+        });
+        game.pot = 0;
+        try { localStorage.setItem('fc3_playerChips', game.players[0].chips); } catch (e) {}
+    }
+
+    function playerAction(action) {
+        if (game.isHandOver || game.mode !== 'poker') return;
+        if (game.actionIndex !== 0) return;
+        const p = human();
+        if (p.folded || p.allIn) return;
+
+        document.getElementById('action-bar-container').style.pointerEvents = 'none';
+        document.getElementById('raise-panel').classList.remove('active');
+
+        if (action === 'fold') {
+            p.folded = true;
+            if (Math.random() > 0.5) hoytSay('Running away, Jason?');
+            setMessage('You folded.');
+            updateUI(); afterPlayerActed(0, false); return;
+        }
+
+        if (action === 'call') {
+            let amountToCall = Math.max(0, game.currentBet - p.bet);
+            if (amountToCall > p.chips) amountToCall = p.chips;
+            p.chips -= amountToCall; game.pot += amountToCall; p.bet += amountToCall;
+            if (p.chips === 0) p.allIn = true;
+            if (amountToCall > 0) spawnChips(chipSpawnForSeat(0), new THREE.Vector3(0, 0.55, 0.9), amountToCall);
+            if (p.allIn) setMessage('You are ALL IN.');
+            else if (amountToCall === 0) setMessage('You check.');
+            else setMessage(`You called $${amountToCall}.`);
+            updateUI(); afterPlayerActed(0, false); return;
+        }
+    }
+
+    function handStrength(player) {
+        const best = getBestHand([...player.hand, ...game.community]);
+        let winProb = 0.12;
+        if (best.score > 8000000000) winProb = 0.96;
+        else if (best.score > 7000000000) winProb = 0.90;
+        else if (best.score > 6000000000) winProb = 0.80;
+        else if (best.score > 5000000000) winProb = 0.70;
+        else if (best.score > 4000000000) winProb = 0.55;
+        else if (best.score > 3000000000) winProb = 0.40;
+        else if (best.score > 2000000000) winProb = 0.26;
+        else {
+            const highVal = Math.max(rankToValue(player.hand[0].rank), rankToValue(player.hand[1].rank));
+            if (highVal >= 14) winProb = 0.22; else if (highVal >= 13) winProb = 0.18;
+            else if (highVal >= 11) winProb = 0.14; else winProb = 0.08;
+        }
+        const alive = playersInHand().length;
+        if (alive <= 2) winProb += 0.05;
+        return Math.max(0.04, Math.min(0.97, winProb + (Math.random() - 0.5) * 0.06));
+    }
+
+    function runAI(seat) {
+        if (game.isHandOver) return;
+        const p = game.players[seat];
+        if (!p || p.folded || p.allIn) { afterPlayerActed(seat, false); return; }
+
+        const winProb = handStrength(p);
+        let amountToCall = Math.max(0, game.currentBet - p.bet);
+        if (amountToCall > p.chips) amountToCall = p.chips;
+        const potOdds = amountToCall > 0 ? amountToCall / (game.pot + amountToCall) : 0;
+        const stack = p.chips;
+        const shortStack = stack < game.pot * 1.1 || stack < 70;
+
+        let action = 'call'; let wantAllIn = false;
+
+        if (winProb >= 0.78) {
+            action = 'raise';
+            if (winProb >= 0.90 && Math.random() < 0.5) wantAllIn = true;
+            else if (shortStack && Math.random() < 0.4) wantAllIn = true;
+        } else if (winProb >= 0.48) {
+            if (amountToCall === 0) action = Math.random() < 0.5 ? 'raise' : 'call';
+            else if (winProb > potOdds + 0.06) action = Math.random() < 0.35 ? 'raise' : 'call';
+            else action = 'call';
+            if (shortStack && winProb > 0.45 && Math.random() < 0.28) { action = 'raise'; wantAllIn = true; }
+        } else if (winProb >= 0.26) {
+            if (amountToCall === 0) action = Math.random() < 0.15 ? 'raise' : 'call';
+            else if (amountToCall <= stack * 0.12 || winProb > potOdds) action = 'call';
+            else if (amountToCall > stack * 0.35) action = 'fold';
+            else action = 'call';
+        } else {
+            if (amountToCall === 0) action = 'call';
+            else if (amountToCall <= 12 && Math.random() < 0.2) action = 'call';
+            else action = 'fold';
+        }
+        if (amountToCall === 0 && action === 'fold') action = 'call';
+
+        if (action === 'fold') {
+            p.folded = true;
+            setMessage(`${p.name} folds.`);
+            if (p.isHoyt) speak('HOYT', 'fold');
+            else if (p.name === 'BUCK') speak('BUCK', 'fold');
+            else if (p.name === 'RILEY') speak('RILEY', 'fold');
+            updateUI(); afterPlayerActed(seat, false); return;
+        }
+
+        if (action === 'raise') {
+            let totalCost;
+            if (wantAllIn) totalCost = stack;
+            else {
+                let raiseExtra = Math.floor(game.pot * (0.5 + Math.random() * 0.5)) + 15;
+                totalCost = amountToCall + raiseExtra;
+                if (totalCost > stack) totalCost = stack;
+                if (stack - totalCost < 20 && stack > amountToCall) totalCost = stack;
+            }
+            totalCost = Math.min(totalCost, stack);
+            if (totalCost < amountToCall) totalCost = amountToCall;
+
+            p.chips -= totalCost; game.pot += totalCost; p.bet += totalCost;
+            const wasRaise = p.bet > game.currentBet;
+            game.currentBet = Math.max(game.currentBet, p.bet);
+            if (p.chips === 0) p.allIn = true;
+
+            if (totalCost > 0) spawnChips(chipSpawnForSeat(seat), new THREE.Vector3(0, 0.55, 0.9), totalCost);
+            if (p.allIn) {
+                setMessage(`${p.name} is ALL IN!`);
+                if (p.isHoyt) speak('HOYT', 'allin');
+                else if (p.name === 'BUCK') speak('BUCK', 'allin');
+                else if (p.name === 'RILEY') speak('RILEY', 'allin');
+            } else {
+                setMessage(`${p.name} raises to $${game.currentBet}.`);
+                if (p.isHoyt) speak('HOYT', 'raise');
+                else if (p.name === 'BUCK') speak('BUCK', 'raise');
+                else if (p.name === 'RILEY') speak('RILEY', 'raise');
+            }
+            updateUI(); afterPlayerActed(seat, wasRaise); return;
+        }
+
+        const callAmt = Math.min(amountToCall, p.chips);
+        p.chips -= callAmt; game.pot += callAmt; p.bet += callAmt;
+        if (p.chips === 0) p.allIn = true;
+        if (callAmt > 0) spawnChips(chipSpawnForSeat(seat), new THREE.Vector3(0, 0.55, 0.9), callAmt);
+        setMessage(callAmt > 0 ? `${p.name} calls $${callAmt}.` : `${p.name} checks.`);
+        updateUI(); afterPlayerActed(seat, false);
+    }
+
+    function advancePhase() {
+        if (game.isHandOver) return;
+
+        game.players.forEach(p => { p.bet = 0; });
+        game.currentBet = 0; game.lastRaiser = -1; game.actedSinceRaise = 0;
+
+        if (game.phase === 'pre-flop') { game.phase = 'flop'; game.community = [game.deck.pop(), game.deck.pop(), game.deck.pop()]; setMessage('FLOP dealt.'); }
+        else if (game.phase === 'flop') { game.phase = 'turn'; game.community.push(game.deck.pop()); setMessage('TURN dealt.'); }
+        else if (game.phase === 'turn') { game.phase = 'river'; game.community.push(game.deck.pop()); setMessage('RIVER dealt.'); }
+        else if (game.phase === 'river') { showdown(); return; }
+
+        for (let i = scene.children.length - 1; i >= 0; i--) { if (scene.children[i].userData && scene.children[i].userData.isCommunity) scene.remove(scene.children[i]); }
+        game.community.forEach((card, index) => {
+            const mat = new THREE.MeshPhongMaterial({ map: createCardTexture(card.rank, card.suit) });
+            const mesh = new THREE.Mesh(cardGeo, [mat, mat, mat, mat, mat, mat]);
+            const targetPos = new THREE.Vector3(-2 + index * 1, 0.65, -0.85);
+            mesh.position.set(0, 1, 0);
+            mesh.userData = { isCommunity: true, start: new THREE.Vector3(0, 1, 0), end: targetPos, progress: 0 };
+            scene.add(mesh); activeCards.push(mesh);
+        });
+
+        const canAct = countToAct();
+        if (canAct <= 1) {
+            document.getElementById('action-bar-container').style.pointerEvents = 'none';
+            setTimeout(advancePhase, 1600); return;
+        }
+
+        game.actionIndex = nextActiveIndex(game.dealerIndex);
+        if (game.actionIndex < 0) { setTimeout(advancePhase, 800); return; }
+        setTimeout(() => promptCurrentPlayer(), 600);
+    }
+
+    function rankToValue(rank) { if (rank === 'T') return 10; if (rank === 'J') return 11; if (rank === 'Q') return 12; if (rank === 'K') return 13; if (rank === 'A') return 14; return parseInt(rank, 10); }
+
+    // FIXED: Now returns cards and fixes Full House tie-breaker
+    function evaluate5Cards(cards) {
+        let values = cards.map(c => rankToValue(c.rank)).sort((a, b) => b - a);
+        let suitsArr = cards.map(c => c.suit); let isFlush = suitsArr.every(s => s === suitsArr[0]);
+        let uniqueValues = [...new Set(values)]; let isStraight = false, straightHigh = 0;
+        if (uniqueValues.length === 5) {
+            if (values[0] - values[4] === 4) { isStraight = true; straightHigh = values[0]; }
+            else if (values[0] === 14 && values[1] === 5 && values[2] === 4 && values[3] === 3 && values[4] === 2) { isStraight = true; straightHigh = 5; }
+        }
+        let counts = {}; values.forEach(v => counts[v] = (counts[v] || 0) + 1);
+        let sortedCounts = Object.keys(counts).map(v => ({ value: parseInt(v, 10), count: counts[v] })).sort((a, b) => b.count - a.count || b.value - a.value);
+
+        if (isStraight && isFlush) return { score: 9000000000 + straightHigh, name: straightHigh === 14 ? "Royal Flush" : "Straight Flush", cards: cards };
+        if (sortedCounts[0].count === 4) return { score: 8000000000 + sortedCounts[0].value, name: "Four of a Kind", cards: cards };
+        if (sortedCounts[0].count === 3 && sortedCounts[1] && sortedCounts[1].count === 2) 
+            return { score: 7000000000 + (sortedCounts[0].value * 100) + sortedCounts[1].value, name: "Full House", cards: cards };
+        if (isFlush) return { score: 6000000000 + values[0], name: "Flush", cards: cards };
+        if (isStraight) return { score: 5000000000 + straightHigh, name: "Straight", cards: cards };
+        if (sortedCounts[0].count === 3) return { score: 4000000000 + sortedCounts[0].value, name: "Three of a Kind", cards: cards };
+        if (sortedCounts[0].count === 2 && sortedCounts[1] && sortedCounts[1].count === 2) 
+            return { score: 3000000000 + sortedCounts[0].value * 100 + sortedCounts[1].value, name: "Two Pair", cards: cards };
+        if (sortedCounts[0].count === 2) return { score: 2000000000 + sortedCounts[0].value, name: "One Pair", cards: cards };
+        return { score: 1000000000 + values[0], name: "High Card", cards: cards };
+    }
+
+    function getBestHand(cards) {
+        if (cards.length < 5) return { score: 0, name: "None", cards: [] };
+        if (cards.length === 5) return evaluate5Cards(cards);
+        let best = { score: -1, name: "None", cards: [] }; const n = cards.length;
+        for (let i = 0; i < n - 4; i++) for (let j = i + 1; j < n - 3; j++) for (let k = j + 1; k < n - 2; k++) for (let l = k + 1; l < n - 1; l++) for (let m = l + 1; m < n; m++) {
+            const result = evaluate5Cards([cards[i], cards[j], cards[k], cards[l], cards[m]]);
+            if (result.score > best.score) best = result;
+        }
+        return best;
+    }
+
+    // Helper to generate 2D card HTML
+    function renderCardsHTML(cards) {
+        if (!cards || cards.length === 0) return '';
+        let sorted = [...cards].sort((a,b) => rankToValue(b.rank) - rankToValue(a.rank));
+        return sorted.map(c => {
+            const isRed = c.suit === 'h' || c.suit === 'd';
+            return `<div class="sd-card ${isRed ? 'red' : ''}">${c.rank === 'T' ? '10' : c.rank}<span>${suitSymbols[c.suit]}</span></div>`;
+        }).join('');
+    }
+
+    function showdown() {
+        document.getElementById('action-bar-container').style.pointerEvents = 'none';
+        game.isHandOver = true;
+
+        // Reveal all non-folded AI cards on the 3D table (for visual effect behind the overlay)
+        for (let i = scene.children.length - 1; i >= 0; i--) {
+            const obj = scene.children[i];
+            if (obj.userData && obj.userData.isCard && obj.userData.seat > 0) scene.remove(obj);
+        }
+        
+        const contenders = [];
+        for (let s = 0; s < 4; s++) {
+            const p = game.players[s];
+            if (p.folded) continue;
+            const best = getBestHand([...p.hand, ...game.community]);
+            contenders.push({ id: s, name: p.name, best, isHuman: p.isHuman, isHoyt: p.isHoyt });
+            
+            if (s > 0) {
+                p.hand.forEach((card, index) => {
+                    const mat = new THREE.MeshPhongMaterial({ map: createCardTexture(card.rank, card.suit) });
+                    const mesh = new THREE.Mesh(cardGeo, [mat, mat, mat, mat, mat, mat]);
+                    const pos = seatCardPos(s, index);
+                    mesh.position.copy(pos); mesh.rotation.x = -Math.PI / 2;
+                    mesh.userData = { isCard: true, seat: s };
+                    scene.add(mesh);
+                });
+            }
+        }
+
+        contenders.sort((a, b) => b.best.score - a.best.score);
+        const topScore = contenders[0].best.score;
+        const winners = contenders.filter(c => c.best.score === topScore);
+        const potAmount = Math.max(0, game.pot | 0);
+
+        awardPotTo(winners.map(w => w.id));
+        game.humanWonPot = winners.some(w => w.isHuman);
+
+        // Build the Far Cry 3 HTML Overlay
+        let sdHtml = '';
+        contenders.forEach(c => {
+            const isWinner = (c.best.score === topScore);
+            const rowClass = isWinner ? 'sd-row winner' : 'sd-row';
+            sdHtml += `
+                <div class="${rowClass}">
+                    <div class="sd-info">
+                        <div class="sd-name">${c.name}</div>
+                        <div class="sd-hand">${c.best.name}</div>
+                    </div>
+                    <div class="sd-cards">
+                        ${renderCardsHTML(c.best.cards)}
+                    </div>
+                </div>
+            `;
+        });
+
+        document.getElementById('sd-rows-container').innerHTML = sdHtml;
+        document.getElementById('showdown-overlay').style.display = 'flex';
+
+        // Audio/Dialogue
+        if (winners.length === 1) {
+            const w = winners[0];
+            if (w.isHoyt) speak('HOYT', 'win');
+            else if (w.name === 'BUCK') speak('BUCK', 'win');
+            else if (w.name === 'RILEY') speak('RILEY', 'win');
+            else if (w.isHuman) {
+                const losers = contenders.filter(c => c.best.score < topScore);
+                if (losers.some(l => l.isHoyt)) speak('HOYT', 'lose');
+                else if (losers.some(l => l.name === 'BUCK')) speak('BUCK', 'lose');
+                else if (losers.some(l => l.name === 'RILEY')) speak('RILEY', 'lose');
+            }
+        } else {
+            speak('HOYT', 'lose');
+        }
+
+        updateUI();
+    }
+
+    function dismissShowdown() {
+        document.getElementById('showdown-overlay').style.display = 'none';
+        
+        if (game.humanWonPot && human().chips > 100) {
+            offerSideBet();
+        } else {
+            endHandSequence();
+        }
+    }
+
+    function endHandSequence() {
+        const raisePanel = document.getElementById('raise-panel');
+        if (raisePanel) raisePanel.classList.remove('active');
+        const btnArea = document.getElementById('action-bar-container');
+        btnArea.innerHTML = `<button onclick="startGame()" style="background-color: #2980b9; border-color: #3498db; width: 100%; max-width: 280px; flex: none;">DEAL NEXT HAND</button>`;
+        btnArea.style.pointerEvents = 'auto';
+        document.getElementById('message').style.fontSize = "16px";
+        setMessage("Hand complete.");
+    }
+
+    function spawnChips(startPos, targetPos, amount) {
+        const numChips = Math.min(Math.max(1, Math.floor(amount / 18)), 10);
+        for (let i = 0; i < numChips; i++) {
+            const mat = amount > 80 ? chipMats.black : chipMats.red;
+            const chip = new THREE.Mesh(chipGeo, mat);
+            chip.position.copy(startPos); chip.position.x += (Math.random() - 0.5) * 0.5; chip.position.z += (Math.random() - 0.5) * 0.5;
+            chip.userData = { start: startPos.clone(), end: targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.7, 0.08 + Math.random() * 0.25, (Math.random() - 0.5) * 0.5)), progress: 0 };
+            scene.add(chip); activeChips.push(chip);
+        }
+    }
+
+    function updateUI() {
+        for (let i = 0; i < 4; i++) {
+            const el = document.getElementById('chips-' + i);
+            if (el) el.innerText = game.players[i].chips;
+        }
+        document.getElementById('pot').innerText = game.pot;
+
+        const p = human();
+        const callBtn = document.getElementById('btn-call');
+        const raiseBtn = document.getElementById('btn-raise');
+        if (callBtn) {
+            const amountToCall = Math.max(0, game.currentBet - p.bet);
+            if (p.chips === 0 || p.allIn) { callBtn.innerText = 'ALL IN'; callBtn.style.backgroundColor = '#641e16'; }
+            else if (amountToCall === 0) { callBtn.innerText = 'CHECK'; callBtn.style.backgroundColor = '#2980b9'; }
+            else if (amountToCall >= p.chips) { callBtn.innerText = `ALL IN $${p.chips}`; callBtn.style.backgroundColor = '#641e16'; }
+            else { callBtn.innerText = `CALL $${amountToCall}`; callBtn.style.backgroundColor = '#1e641e'; }
+        }
+        if (raiseBtn) {
+            raiseBtn.disabled = (p.chips <= Math.max(0, game.currentBet - p.bet) || p.chips === 0 || p.folded);
+        }
+    }
+
+    function updateRaiseDisplay() {
+        const slider = document.getElementById('raise-slider');
+        if (!slider) return;
+        document.getElementById('raise-display').innerText = slider.value;
+        document.getElementById('btn-confirm-raise').innerText = `CONFIRM RAISE $${slider.value}`;
+    }
+
+    function setBet(type) {
+        const slider = document.getElementById('raise-slider'); if (!slider) return;
+        let target = parseInt(slider.value, 10);
+        if (type === 'min') target = parseInt(slider.min, 10);
+        else if (type === 'half') target = game.currentBet + Math.floor(game.pot / 2);
+        else if (type === 'pot') target = game.currentBet + game.pot;
+        else if (type === 'allin') target = parseInt(slider.max, 10);
+        target = Math.max(parseInt(slider.min, 10), Math.min(parseInt(slider.max, 10), target));
+        target = Math.round(target / 10) * 10;
+        if (target < parseInt(slider.min, 10)) target = parseInt(slider.min, 10);
+        slider.value = target; updateRaiseDisplay();
+    }
+
+    function setMessage(msg) {
+        const msgEl = document.getElementById('message');
+        msgEl.innerHTML = msg || "";
+        msgEl.style.fontSize = "16px";
+        msgEl.style.color = "#f1c40f";
+    }
+
+    // --- FIGHT / BOXING RING ---
+    function openFightBet() {
+        if (human().chips < 25) { setMessage('Not enough chips to bet.'); return; }
+        document.getElementById('fight-bet-text').innerText = '"Step into the ring. Winner takes the bet. Hoyt\'s rules."';
+        document.getElementById('fight-bet-modal').style.display = 'flex';
+        const foes = ['BUCK', 'RILEY', 'HOYT'];
+        fight.enemyName = foes[Math.floor(Math.random() * foes.length)];
+        speak(fight.enemyName, 'fight');
+    }
+    function closeFightBet() { document.getElementById('fight-bet-modal').style.display = 'none'; }
+
+    function resetFPArms() {
+        [fpArmL, fpArmR].forEach(a => {
+            const b = a.userData.base;
+            a.position.set(b.x, b.y, b.z); a.rotation.set(b.rx, 0, 0);
+        });
+    }
+
+    function startFight(bet) {
+        const p = human();
+        if (p.chips < bet) { setMessage('You cannot cover that bet.'); return; }
+        p.chips -= bet;
+        fight.bet = bet; fight.playerHp = 100; fight.enemyHp = 100;
+        fight.active = true; fight.busy = false;
+        fight.playerBlocking = false; fight.enemyBlocking = false;
+        fight.playerCooldown = 0; fight.enemyCooldown = 0;
+        try { localStorage.setItem('fc3_playerChips', p.chips); } catch (e) {}
+        updateUI(); closeFightBet();
+
+        document.getElementById('walking-ui').style.display = 'none';
+        document.getElementById('poker-ui').style.display = 'none';
+        document.getElementById('fight-ui').style.display = 'block';
+        document.getElementById('fight-enemy-name').innerText = fight.enemyName;
+        document.getElementById('fight-msg').innerText = 'Fight! Punch or Block.';
+        updateFightHp();
+
+        game.mode = 'fight';
+        camera.position.set(ringCenter.x, 1.75, ringCenter.z + 2.4);
+        camera.lookAt(ringCenter.x, 1.55, ringCenter.z - 1.0);
+        euler.setFromQuaternion(camera.quaternion);
+
+        fpArms.visible = true; bottleGroup.visible = false; resetFPArms();
+
+        fight.enemySeat = fight.enemyName === 'HOYT' ? 1 : fight.enemyName === 'BUCK' ? 2 : 3;
+        fight.enemyChar = seatChars[fight.enemySeat];
+        if (fight.enemyChar) {
+            fight.enemyChar.userData.home = fight.enemyChar.position.clone();
+            fight.enemyChar.userData.homeRot = fight.enemyChar.rotation.clone();
+            fight.enemyChar.userData.homeScale = fight.enemyChar.scale.clone();
+            fight.enemyChar.position.set(ringCenter.x, -0.85, ringCenter.z - 1.35);
+            fight.enemyChar.rotation.set(0, 0, 0);
+            fight.enemyChar.scale.set(1.2, 1.25, 1.2);
+        }
+
+        clearInterval(window.fightAITimer);
+        window.fightAITimer = setInterval(enemyFightAI, 850 + Math.random() * 450);
+    }
+
+    function updateFightHp() {
+        const pf = document.getElementById('hp-player'); const ef = document.getElementById('hp-enemy');
+        if (pf) pf.style.width = Math.max(0, fight.playerHp) + '%';
+        if (ef) ef.style.width = Math.max(0, fight.enemyHp) + '%';
+    }
+
+    function setFightMsg(t) { const el = document.getElementById('fight-msg'); if (el) el.innerText = t; }
+
+    function fightPunch() {
+        if (!fight.active || fight.busy) return;
+        if (performance.now() < fight.playerCooldown) return;
+        fight.busy = true; fight.playerBlocking = false; fight.playerCooldown = performance.now() + 420;
+
+        const useRight = Math.random() > 0.35;
+        const arm = useRight ? fpArmR : fpArmL;
+        const moves = ['jab', 'hook', 'cross', 'uppercut'];
+        const move = moves[Math.floor(Math.random() * moves.length)];
+        setFightMsg(`You throw a ${move}!`);
+
+        arm.position.z = -0.95; arm.position.y = -0.12; arm.rotation.x = -0.6;
+        if (move === 'hook') arm.rotation.y = useRight ? -0.7 : 0.7;
+        if (move === 'uppercut') { arm.position.y = 0.05; arm.rotation.x = -1.1; }
+
+        setTimeout(() => {
+            if (!fight.active) return;
+            let dmg = 12 + Math.floor(Math.random() * 14);
+            if (move === 'hook') dmg += 4;
+            if (move === 'uppercut') dmg += 7;
+
+            if (fight.enemyBlocking) {
+                dmg = Math.floor(dmg * 0.25);
+                setFightMsg(`${fight.enemyName} blocks your ${move}!`);
+                fight.enemyBlocking = false;
+            } else {
+                setFightMsg(`${move.toUpperCase()} lands! -${dmg}`);
+                applyEnemyHit(dmg);
+            }
+            resetFPArms(); fight.busy = false; checkFightEnd();
+        }, 200);
+    }
+
+    function fightBlock() {
+        if (!fight.active || fight.busy) return;
+        fight.playerBlocking = true; setFightMsg('Guarding!');
+        fpArmL.position.set(-0.18, -0.08, -0.7); fpArmR.position.set(0.18, -0.08, -0.7);
+        fpArmL.rotation.set(-0.9, 0.2, 0); fpArmR.rotation.set(-0.9, -0.2, 0);
+        setTimeout(() => {
+            fight.playerBlocking = false; resetFPArms();
+            if (fight.active) setFightMsg('Guard down.');
+        }, 750);
+    }
+
+    function applyEnemyHit(dmg) {
+        fight.enemyHp = Math.max(0, fight.enemyHp - dmg); updateFightHp();
+        if (fight.enemyChar) {
+            const g = fight.enemyChar;
+            g.rotation.x = -0.5 - Math.random() * 0.3;
+            g.rotation.z = (Math.random() - 0.5) * 0.7;
+            g.position.z = ringCenter.z - 1.35 - 0.4;
+            g.position.y = -0.55;
+            setTimeout(() => {
+                if (!fight.enemyChar || !fight.active) return;
+                g.rotation.x = 0; g.rotation.z = 0;
+                g.position.y = -0.85; g.position.z = ringCenter.z - 1.35;
+            }, 300);
+        }
+    }
+
+    function applyPlayerHit(dmg) {
+        if (fight.playerBlocking) {
+            dmg = Math.floor(dmg * 0.2); setFightMsg(`Blocked! Only -${dmg}`);
+            fpArmL.position.z = -0.55; fpArmR.position.z = -0.55;
+            fight.playerBlocking = false; setTimeout(resetFPArms, 200);
+        } else {
+            setFightMsg(`${fight.enemyName} hits you! -${dmg}`);
+            camera.position.x += (Math.random() - 0.5) * 0.2;
+            camera.position.y += (Math.random() - 0.5) * 0.08;
+        }
+        fight.playerHp = Math.max(0, fight.playerHp - dmg); updateFightHp();
+        camera.position.x += (Math.random() - 0.5) * 0.25;
+        camera.position.y += (Math.random() - 0.5) * 0.1;
+    }
+
+    function enemyFightAI() {
+        if (!fight.active || fight.busy) return;
+        if (performance.now() < fight.enemyCooldown) return;
+
+        const roll = Math.random();
+        if (roll < 0.22) {
+            fight.enemyBlocking = true; setFightMsg(`${fight.enemyName} raises guard.`);
+            setTimeout(() => { fight.enemyBlocking = false; }, 650);
+            fight.enemyCooldown = performance.now() + 500; return;
+        }
+
+        fight.enemyCooldown = performance.now() + 550 + Math.random() * 400;
+        const moves = ['jab', 'hook', 'haymaker', 'body shot'];
+        const move = moves[Math.floor(Math.random() * moves.length)];
+        let dmg = 10 + Math.floor(Math.random() * 12);
+        if (move === 'haymaker') dmg += 8;
+        if (move === 'hook') dmg += 3;
+
+        setTimeout(() => {
+            if (!fight.active) return;
+            applyPlayerHit(dmg); checkFightEnd();
+        }, 200);
+    }
+
+    function checkFightEnd() {
+        if (!fight.active) return;
+        if (fight.enemyHp <= 0) endFight(true);
+        else if (fight.playerHp <= 0) endFight(false);
+    }
+
+    function endFight(playerWon) {
+        fight.active = false; clearInterval(window.fightAITimer);
+        document.getElementById('fight-actions').style.pointerEvents = 'none';
+
+        if (playerWon) {
+            human().chips += fight.bet * 2;
+            setFightMsg(`KO! You win $${fight.bet * 2}!`);
+            speak(fight.enemyName, 'lose');
+        } else {
+            setFightMsg(`You're down! Lost $${fight.bet}.`);
+            speak(fight.enemyName, 'win');
+        }
+        try { localStorage.setItem('fc3_playerChips', human().chips); } catch (e) {}
+        updateUI();
+
+        setTimeout(() => {
+            if (fight.enemyChar && fight.enemyChar.userData.home) {
+                fight.enemyChar.position.copy(fight.enemyChar.userData.home);
+                if (fight.enemyChar.userData.homeRot) fight.enemyChar.rotation.copy(fight.enemyChar.userData.homeRot);
+                if (fight.enemyChar.userData.homeScale) fight.enemyChar.scale.copy(fight.enemyChar.userData.homeScale);
+            }
+            fpArms.visible = false; resetFPArms();
+            document.getElementById('fight-ui').style.display = 'none';
+            document.getElementById('fight-actions').style.pointerEvents = 'auto';
+            document.getElementById('walking-ui').style.display = 'block';
+            game.mode = 'walking';
+            camera.position.set(ringCenter.x + 1.5, 1.7, ringCenter.z + 3.5);
+            camera.lookAt(ringCenter.x, 1.2, ringCenter.z);
+            euler.setFromQuaternion(camera.quaternion);
+        }, 2200);
+    }
+
+    window.playerAction = playerAction; window.standUp = standUp; window.returnToTable = returnToTable;
+    window.openBartenderDialogue = openBartenderDialogue; window.closeDialogue = closeDialogue;
+    window.buyDrink = buyDrink; window.consumeDrink = consumeDrink; window.setBet = setBet;
+    window.updateRaiseDisplay = updateRaiseDisplay; window.startGame = startGame;
+    window.openRaisePanel = openRaisePanel; window.confirmRaise = confirmRaise; window.takeSideBet = takeSideBet;
+    window.openFightBet = openFightBet; window.closeFightBet = closeFightBet;
+    window.startFight = startFight; window.fightPunch = fightPunch; window.fightBlock = fightBlock;
+    window.dismissShowdown = dismissShowdown;
+
+    function init() { onWindowResize(); startGame(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else setTimeout(init, 50);
+})();
+</script>
+</body>
+</html>
